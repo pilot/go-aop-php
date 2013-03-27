@@ -58,4 +58,16 @@ abstract class AbstractInvocation extends AbstractJoinpoint implements Invocatio
     {
         return $this->arguments;
     }
+
+    /**
+     * Do not serialize state values for invocation.
+     *
+     * We want to serialize only advices and className
+     *
+     * @return mixed
+     */
+    public function __sleep()
+    {
+        return array('advices', 'className');
+    }
 }

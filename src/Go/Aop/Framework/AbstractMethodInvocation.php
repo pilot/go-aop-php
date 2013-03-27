@@ -12,6 +12,8 @@ use ReflectionMethod;
 
 use Go\Aop\Intercept\MethodInvocation;
 use Go\Aop\Intercept\MethodInterceptor;
+use Go\Aop\Support\ParseTimeReflectionMethod;
+
 
 /**
  * Abstract method invocation implementation
@@ -46,7 +48,12 @@ abstract class AbstractMethodInvocation extends AbstractInvocation implements Me
     public function __construct($className, $methodName, array $advices)
     {
         parent::__construct($className, $advices);
-        $this->reflectionMethod = $method = new ReflectionMethod($this->className, $methodName);
+        if (!class_exists($this->className, false)) {
+            // Super-tricky code! Used to create the stub for serialization, but will never be used for real invocation
+            $this->reflectionMethod = $method = new ParseTimeReflectionMethod($this->className, $methodName);
+        } else {
+            $this->reflectionMethod = $method = new ReflectionMethod($this->className, $methodName);
+        }
 
         // Give an access to call protected method
         if ($method->isProtected()) {
@@ -130,5 +137,29 @@ abstract class AbstractMethodInvocation extends AbstractInvocation implements Me
             list($this->arguments, $this->instance, $this->current) = array_pop($this->stackFrames);
         }
         return $result;
+    }
+
+    /**
+     * Do not serialize state values for invocation.
+     *
+     * We want to serialize only parent properties and reflectionMethod property
+     *
+     * @return mixed
+     */
+    public function __sleep()
+    {
+        return array_merge(parent::__sleep(), array('reflectionMethod'));
+    }
+
+    /**
+     * Restore the state after unserialization
+     */
+    public function __wakeup()
+    {
+        $this->reflectionMethod->__construct($this->reflectionMethod->class, $this->reflectionMethod->name);
+        // Give an access to call protected method
+        if ($this->reflectionMethod->isProtected()) {
+            $this->reflectionMethod->setAccessible(true);
+        }
     }
 }

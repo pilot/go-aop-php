@@ -104,19 +104,19 @@ class ClassProxy extends AbstractProxy
      * NB This method will be used as a callback during source code evaluation to inject joinpoints
      *
      * @param string $className Aop child proxy class
-     * @param array|Advice[] $advices List of advices to inject into class
+     * @param array|Joinpoint[] $joinPoints List of joinpoints to inject into class
      *
      * @return void
      */
-    public static function injectJoinPoints($className, array $advices = array())
+    public static function injectJoinPoints($className, array $joinPoints = array())
     {
-        if (!$advices) {
-            $container = AspectKernel::getInstance()->getContainer();
-            $advices   = $container->getAdvicesForClass($className);
-        }
+        $className = new ReflectionClass($className);
 
-        $className  = new ReflectionClass($className);
-        $joinPoints = static::wrapWithJoinPoints($advices, $className->getParentClass()->name);
+        if (!$joinPoints) {
+            $container  = AspectKernel::getInstance()->getContainer();
+            $advices    = $container->getAdvicesForClass($className);
+            $joinPoints = static::wrapWithJoinPoints($advices, $className->getParentClass()->name);
+        }
 
         /** @var $prop Property */
         $prop = $className->getProperty('__joinPoints');
@@ -267,7 +267,19 @@ class ClassProxy extends AbstractProxy
         if ($this->isFieldsIntercepted && (!$ctor || !$ctor->isPrivate())) {
             $this->addFieldInterceptorsCode($ctor);
         }
-        $serialized = serialize($this->advices);
+        $serialized = serialize(
+            self::wrapWithJoinPoints(
+                $this->advices,
+                $this->class->getNamespaceName() . '\\' . $this->parentClassName
+            )
+        );
+
+        // Mega-trick to unserialize correct ReflectionMethod )
+        $serialized = str_replace(
+            'O:40:"Go\Aop\Support\ParseTimeReflectionMethod"',
+            'O:16:"ReflectionMethod"',
+            $serialized
+        );
 
         ksort($this->methodsCode);
         ksort($this->propertiesCode);

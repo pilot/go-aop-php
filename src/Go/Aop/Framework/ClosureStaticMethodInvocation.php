@@ -79,4 +79,13 @@ class ClosureStaticMethodInvocation extends AbstractMethodInvocation
             return forward_static_call_array(array($className, $method), $args);
         };
     }
+
+    /**
+     * Restore the state after unserialization
+     */
+    public function __wakeup()
+    {
+        parent::__wakeup();
+        $this->closureToCall = $this->getStaticInvoker($this->className, $this->reflectionMethod->name);
+    }
 }
